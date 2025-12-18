@@ -1,24 +1,24 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+
+import inquiryRoute from "./api/inquiry.js";
+
+dotenv.config();
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-/* ------------------ MongoDB ------------------ */
-mongoose
-  .connect(process.env.DBURL)
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.error(err));
+app.use("/api/inquiry", inquiryRoute);
 
-/* ------------------ Routes ------------------ */
-const inquiryRoutes = require("./api/inquiry");
-app.use("/api", inquiryRoutes);
+app.get("/", (req, res) => {
+  res.send("Backend is running 🚀");
+});
 
-/* ------------------ Server ------------------ */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+console.log("RESEND KEY:", process.env.RESEND_API_KEY);
