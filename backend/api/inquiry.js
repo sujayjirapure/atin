@@ -1,12 +1,23 @@
+import express from "express";
+import { Resend } from "resend";
+import Inquiry from "../models/Inquiry.js";
+
+const router = express.Router();
+
+/**
+ * POST: New Connection / Complaint
+ */
 router.post("/", async (req, res) => {
   const { type, name, mobile, email, address, issue } = req.body;
 
   try {
     if (!type || !name || !mobile || !email) {
-      return res.status(400).json({ success: false, message: "Missing fields" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing fields" });
     }
 
-    // Save to DB
+    // Save to MongoDB
     const inquiry = await Inquiry.create({
       type,
       name,
@@ -27,7 +38,11 @@ router.post("/", async (req, res) => {
           ? "📩 New Connection Inquiry"
           : "🚨 New Customer Complaint",
       html: `
-        <h3>${type === "connection" ? "New Connection Inquiry" : "New Complaint"}</h3>
+        <h3>${
+          type === "connection"
+            ? "New Connection Inquiry"
+            : "New Complaint"
+        }</h3>
         <p><strong>Name:</strong> ${name}</p>
         <p><strong>Mobile:</strong> ${mobile}</p>
         <p><strong>Email:</strong> ${email}</p>
@@ -49,3 +64,18 @@ router.post("/", async (req, res) => {
     res.status(500).json({ success: false });
   }
 });
+
+/**
+ * GET: Fetch all inquiries (for dashboard)
+ */
+router.get("/", async (req, res) => {
+  try {
+    const inquiries = await Inquiry.find().sort({ createdAt: -1 });
+    res.status(200).json(inquiries);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch inquiries" });
+  }
+});
+
+/* 🔥 THIS LINE FIXES YOUR RENDER ERROR */
+export default router;
