@@ -1,81 +1,56 @@
 import express from "express";
-import { Resend } from "resend";
-import Inquiry from "../models/Inquiry.js";
+import cors from "cors";
+import dotenv from "dotenv";
+import http from "http";
+import { Server } from "socket.io";
+import mongoose from "mongoose";
 
-const router = express.Router();
+import inquiryRoute from "./api/inquiry.js";
 
-/**
- * POST: New Connection / Complaint
- */
-router.post("/", async (req, res) => {
-  const { type, name, mobile, email, address, issue } = req.body;
+dotenv.config();
 
-  try {
-    if (!type || !name || !mobile || !email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing fields" });
-    }
+const app = express();
+const server = http.createServer(app);
 
-    // Save to MongoDB
-    const inquiry = await Inquiry.create({
-      type,
-      name,
-      mobile,
-      email,
-      address,
-      issue,
-    });
-
-    // Send Email
-    const resend = new Resend(process.env.RESEND_API_KEY);
-
-    await resend.emails.send({
-      from: "ATIN <onboarding@resend.dev>",
-      to: process.env.OWNER_EMAIL,
-      subject:
-        type === "connection"
-          ? "📩 New Connection Inquiry"
-          : "🚨 New Customer Complaint",
-      html: `
-        <h3>${
-          type === "connection"
-            ? "New Connection Inquiry"
-            : "New Complaint"
-        }</h3>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Mobile:</strong> ${mobile}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        ${
-          type === "connection"
-            ? `<p><strong>Address:</strong> ${address}</p>`
-            : `<p><strong>Issue:</strong> ${issue}</p>`
-        }
-      `,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Submitted successfully",
-      data: inquiry,
-    });
-  } catch (error) {
-    console.error("Inquiry Error:", error);
-    res.status(500).json({ success: false });
-  }
+/* SOCKET.IO SETUP */
+const io = new Server(server, {
+  cors: {
+    origin: "*", // later restrict to dashboard domain
+    methods: ["GET", "POST", "DELETE"],
+  },
 });
 
-/**
- * GET: Fetch all inquiries (for dashboard)
- */
-router.get("/", async (req, res) => {
-  try {
-    const inquiries = await Inquiry.find().sort({ createdAt: -1 });
-    res.status(200).json(inquiries);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch inquiries" });
-  }
+/* MAKE IO AVAILABLE IN ROUTES */
+app.set("io", io);
+
+/* MIDDLEWARE */
+app.use(cors());
+app.use(express.json());
+
+/* DB */
+mongoose
+  .connect(process.env.DBURL)
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error(err));
+
+/* ROUTES */
+app.use("/api/inquiry", inquiryRoute);
+
+/* SOCKET EVENTS */
+io.on("connection", (socket) => {
+  console.log("Admin connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("Admin disconnected:", socket.id);
+  });
 });
 
-/* 🔥 THIS LINE FIXES YOUR RENDER ERROR */
-export default router;
+/* HEALTH CHECK */
+app.get("/", (req, res) => {
+  res.send("Backend running 🚀");
+});
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () =>
+  console.log(`Server running on port ${PORT}`)
+);
