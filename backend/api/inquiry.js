@@ -1,29 +1,25 @@
 import express from "express";
-import mongoose from "mongoose";
 import { Resend } from "resend";
+import multer from "multer";
+
+import Inquiry from "../models/inquiry.js";
 
 const router = express.Router();
 
-/* MONGOOSE MODEL */
-const inquirySchema = new mongoose.Schema(
-  {
-    type: String,
-    name: String,
-    mobile: String,
-    email: String,
-    address: String,
-    issue: String,
+/* =======================
+   MULTER CONFIG
+   ======================= */
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
   },
-  { timestamps: true }
-);
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + "-" + file.originalname;
+    cb(null, uniqueName);
+  },
+});
 
-const Inquiry =
-  mongoose.models.Inquiry || mongoose.model("Inquiry", inquirySchema);
-
-/* CONNECT DB (ONCE) */
-if (!mongoose.connection.readyState) {
-  mongoose.connect(process.env.DBURL);
-}
+const upload = multer({ storage });
 
 /* =======================
    GET ALL INQUIRIES
@@ -33,21 +29,29 @@ router.get("/", async (req, res) => {
     const data = await Inquiry.find().sort({ createdAt: -1 });
     res.json(data);
   } catch (err) {
+    console.error("GET ERROR:", err);
     res.status(500).json({ success: false });
   }
 });
 
 /* =======================
-   CREATE INQUIRY
+   CREATE INQUIRY (WITH IMAGE)
    ======================= */
-router.post("/", async (req, res) => {
+router.post("/", upload.single("image"), async (req, res) => {
   try {
+    console.log("🔥 API HIT 🔥");
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
     const { type, name, mobile, email, address, issue } = req.body;
 
     if (!type || !name || !mobile || !email) {
-      return res.status(400).json({ success: false });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing fields" });
     }
 
+    // ✅ SAVE TO DB
     const inquiry = await Inquiry.create({
       type,
       name,
@@ -55,32 +59,44 @@ router.post("/", async (req, res) => {
       email,
       address: address || "",
       issue: issue || "",
+      image: req.file ? `/uploads/${req.file.filename}` : "",
     });
 
-    /* SEND EMAIL */
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    // ✅ SEND EMAIL (NON-BLOCKING)
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY);
 
-    await resend.emails.send({
-      from: "ATIN <onboarding@resend.dev>",
-      to: process.env.OWNER_EMAIL,
-      subject:
-        type === "connection"
-          ? "📩 New Connection Inquiry"
-          : "🚨 New Complaint",
-      html: `
-        <h3>${type.toUpperCase()}</h3>
-        <p><b>Name:</b> ${name}</p>
-        <p><b>Mobile:</b> ${mobile}</p>
-        <p><b>Email:</b> ${email}</p>
-        <p><b>${type === "connection" ? "Address" : "Issue"}:</b>
-        ${address || issue}</p>
-      `,
-    });
+      await resend.emails.send({
+        from: "ATIN <onboarding@resend.dev>",
+        to: process.env.OWNER_EMAIL,
+        subject:
+          type === "connection"
+            ? "📩 New Connection Inquiry"
+            : "🚨 New Complaint",
+        html: `
+          <h3>${type.toUpperCase()}</h3>
+          <p><b>Name:</b> ${name}</p>
+          <p><b>Mobile:</b> ${mobile}</p>
+          <p><b>Email:</b> ${email}</p>
+          <p><b>${type === "connection" ? "Address" : "Issue"}:</b>
+          ${address || issue}</p>
+          ${
+            req.file
+              ? `<p><b>Image:</b><br/>
+                 <img src="${process.env.BASE_URL}${inquiry.image}" width="200"/>
+                 </p>`
+              : ""
+          }
+        `,
+      });
+    } catch (emailErr) {
+      console.error("EMAIL FAILED (IGNORED):", emailErr.message);
+    }
 
     res.status(201).json({ success: true, inquiry });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false });
+    console.error("POST ERROR:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -91,7 +107,8 @@ router.delete("/:id", async (req, res) => {
   try {
     await Inquiry.findByIdAndDelete(req.params.id);
     res.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("DELETE ERROR:", err);
     res.status(500).json({ success: false });
   }
 });

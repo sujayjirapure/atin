@@ -14,6 +14,10 @@ const inquirySchema = new mongoose.Schema(
     // Only one of these will be present
     address: { type: String },
     issue: { type: String },
+    image: {
+      type: String, // stores image path or URL
+      default: "",
+    },
   },
   { timestamps: true }
 );
