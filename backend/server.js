@@ -31,11 +31,18 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://YOUR-FRONTEND.vercel.app",
+      "http://localhost:5173",
+      "https://www.akolatelecomandipnetworks.com",
+      "https://akolatelecomandipnetworks.com",
     ],
-    methods: ["GET", "POST", "DELETE"],
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
   })
 );
+
+// ✅ IMPORTANT: allow preflight for file uploads
+app.options("*", cors());
+
 
 app.use("/uploads", express.static("uploads"));
 
