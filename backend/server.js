@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import path from "path";
 
 import inquiryRoute from "./api/inquiry.js";
 
@@ -25,7 +24,7 @@ mongoose
   });
 
 /* =======================
-   MIDDLEWARE
+   CORS
    ======================= */
 app.use(
   cors({
@@ -40,18 +39,13 @@ app.use(
   })
 );
 
-// ✅ IMPORTANT: allow preflight for file uploads
+// ✅ Allow preflight (important for multipart/form-data)
 app.options("*", cors());
 
-
-app.use("/uploads", express.static("uploads"));
-
-app.use(express.json());
-
 /* =======================
-   STATIC FILES (IMAGES)
+   MIDDLEWARE
    ======================= */
-app.use("/uploads", express.static("uploads"));
+app.use(express.json());
 
 /* =======================
    ROUTES

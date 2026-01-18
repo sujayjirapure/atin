@@ -3,28 +3,27 @@ import { Resend } from "resend";
 import multer from "multer";
 
 import Inquiry from "../models/inquiry.js";
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import cloudinary from "../config/cloudinary.js";
 
 const router = express.Router();
 
 /* =======================
    MULTER CONFIG
    ======================= */
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + "-" + file.originalname;
-    cb(null, uniqueName);
+
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "atin_inquiries",
+    allowed_formats: ["jpg", "jpeg", "png"],
   },
 });
 
-
-
-
-
-
 const upload = multer({ storage });
+
 
 /* =======================
    GET ALL INQUIRIES
@@ -64,7 +63,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       email,
       address: address || "",
       issue: issue || "",
-      image: req.file ? `/uploads/${req.file.filename}` : "",
+      image: req.file ? req.file.path : "",
     });
 
     // ✅ SEND EMAIL (NON-BLOCKING)
